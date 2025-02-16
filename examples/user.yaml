@@ -1,0 +1,28 @@
+types:
+  - name: id
+    id: true
+    inline: BIGSERIAL
+  - name: name
+    inline: VARCHAR(255)
+
+tables: 
+  - &users
+    name: users
+    fields:
+      - name: id
+        type: id
+      - name: name
+        type: name
+  - &groups 
+    name: groups 
+    fields:
+      - name: id
+        type: id
+      - name: name
+        type: name
+  - name: users_group
+    fields:
+      - name: user_id
+        type: *users
+      - name: group_id
+        type: *groups
