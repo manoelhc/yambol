@@ -9,22 +9,24 @@ class Type:
   id: bool = False
   check: str = ""
   inline: str = ""
+  fk: bool = False
+  index: bool = False
   # Strings to adzd at the top of the generated file
-  top: List[str] = field(default_factory=List)
+  top: list[str] = field(default_factory=list)
   # Strings to add before creating the entity
-  before: List[str] = field(default_factory=List)
+  before: list[str] = field(default_factory=list)
   # Strings to add after creating the entity
-  after: List[str] = field(default_factory=List)
-  # Strings to add at the botton of the file
-  botton: List[str] = field(default_factory=List)
+  after: list[str] = field(default_factory=list)
+  # Strings to add at the bottom of the file
+  bottom: list[str] = field(default_factory=list)
   # Strings to adzd at the top of the generated file
-  top_once: List[str] = field(default_factory=List)
+  top_once: list[str] = field(default_factory=list)
   # Strings to add before creating the entity
-  before_once: List[str] = field(default_factory=List)
+  before_once: list[str] = field(default_factory=list)
   # Strings to add after creating the entity
-  after_once: List[str] = field(default_factory=List)
-  # Strings to add at the botton of the file
-  botton_once: List[str] = field(default_factory=List)
+  after_once: list[str] = field(default_factory=list)
+  # Strings to add at the bottom of the file
+  bottom_once: list[str] = field(default_factory=list)
 
 @dataclass
 class Field:
@@ -36,13 +38,24 @@ class Field:
   
 @dataclass
 class ForeignKey:
+  type: str
+  table: str
   field: Field
 
 @dataclass
 class Table:
   name: str
   fields: typing.List[typing.Union[Field, ForeignKey]]
-
+  def __init__(self, name: str, fields: dict):
+    self.name = name
+    all_fields = []
+    for field in fields:
+      if 'fk' in field and field['fk']:
+        all_fields.append(ForeignKey(name, Field(**field)))
+      else:
+        all_fields.append(Field(**field))
+    self.fields = all_fields
+  
 @dataclass
 class Database:
   types: typing.List[Type]

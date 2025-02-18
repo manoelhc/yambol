@@ -1,9 +1,14 @@
 types:
   - name: id
-    id: true
     inline: BIGSERIAL
+    fk: BIGINT
   - name: name
-    inline: VARCHAR(255)
+    inline: VARCHAR(255) UNIQUE NOT NULL
+    index: true
+  - name: now
+    inline: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  - name: email
+    inline: VARCHAR(255) UNIQUE NOT NULL CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$')
 
 tables: 
   - &users
@@ -11,6 +16,7 @@ tables:
     fields:
       - name: id
         type: id
+        pk: true
       - name: name
         type: name
   - &groups 
@@ -18,6 +24,7 @@ tables:
     fields:
       - name: id
         type: id
+        pk: true
       - name: name
         type: name
   - name: users_group

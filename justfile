@@ -10,4 +10,5 @@ run:
   #!/bin/bash
   {{ c_env }}
   cd yambol
+  python -m poetry install
   python -m poetry run -- python -m yambol.app ../examples/user.yaml

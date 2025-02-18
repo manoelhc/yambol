@@ -4,6 +4,6 @@ import sys
 
 def main():
   db = parser.parse(sys.argv[1])
-  SqlPlugin(db).dump()
+  print(SqlPlugin(db).dump())
   
 main()
