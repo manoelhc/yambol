@@ -1,77 +1,105 @@
 from yambol.plugin import Plugin
 import itertools
-from yambol.db_types import Table, ForeignKey, Type, Field
-import types
-from typing import Optional
+import sys
+from yambol.db_types import Table, ForeignKey, Type, Field, Database
+from typing import Optional, List, Dict, Any
 
 class SqlPlugin(Plugin):
-  def dump(self) -> str:
-    onces_top_idx = []
-    onces_before_idx = []
-    onces_after_idx = []
-    onces_bottom_idx = []
-    types_idx = {}
-    for t in self.db.types:
-      types_idx[t.name] = t
-    top = []
-    before = []
-    creates = []
-    after = []
-    bottom = []
-    fk = None
-    pk = None
-    for t in self.db.tables:
-      create = []
-      for f in t.fields:
-        field = Field(**f)
-        if 'type' in f and not isinstance(f['type'], dict):
-          kind = types_idx[f['type']]
-        else:
-          fk_table = Table(**f['type'])
-          fk = find_key(types_idx, Table(**f['type']))
-          kind = types_idx[fk.field.type]
+    def __init__(self, db: Database) -> None:
+        super().__init__(db)
 
-        if kind:
-          if not isinstance(kind.top, types.GenericAlias):
-            top = [*top, *kind.top]
-          elif not isinstance(kind.before, types.GenericAlias):
-            before = [*before, *kind.before]
-          elif not isinstance(kind.after, types.GenericAlias):
-            after = [*after, *kind.after]
-          elif not isinstance(kind.bottom, types.GenericAlias):
-            bottom = [*bottom, *kind.bottom]
+    def dump(self) -> str:
+        self._initialize_dump_vars()
+        self._generate_sql_parts()
+        return self._build_sql_output()
+
+    def _initialize_dump_vars(self) -> None:        
+        """Initialize variables for SQL generation."""
+        self.onces_ = {
+            "top": [f"CREATE DATABASE \"{self.db.name}\";"],
+            "before": [],
+            "after": [],
+            "bottom": []
+        }
+        self.sql_sections = {
+            "top": [],
+            "before": [],
+            "creates": [],
+            "after": [],
+            "bottom": []
+        }
+
+    def _generate_sql_parts(self) -> None:
+        """Generate SQL parts from tables and their fields."""
+        for table in self.db.tables:
+            create_statements: List[str] = []
+            for field in table.fields:
+                inline_def = self._get_inline_definition(field)
+                create_statements.append(
+                    f"\"{field.name}\" {inline_def}"
+                )
             
-          if not isinstance(kind.top_once, types.GenericAlias):
-            onces_top_idx = [*top, *kind.top_once]
-          elif not isinstance(kind.before_once, types.GenericAlias):
-            onces_before_idx = [*top, *kind.before_once]
-          elif not isinstance(kind.after_once, types.GenericAlias):
-            onces_after_idx = [*top, *kind.after_once]
-          elif not isinstance(kind.bottom_once, types.GenericAlias):
-            onces_bottom_idx = [*top, *kind.bottom_once]
-        if fk:
-          inline = f"{fk.type.fk} REFERENCES {fk.table}({fk.field.name})"
-        else:
-          inline = kind.inline if isinstance(kind, Type) else kind
-        if field.pk:
-          inline = f"{inline} PRIMARY KEY"
-        create.append(f"{f["name"]} {inline}")
-      creates.append(f"CREATE TABLE {t.name} (")
-      creates.append(f"  {",\n  ".join(create)}")
-      creates.append(");")
+            self._add_create_table(table.name, create_statements)
+            
+    def _find_key(self, table: Table) -> Optional[ForeignKey]:
+        """Find the primary key for a given table."""
+        for field in table.fields:
+            if isinstance(field, Field):
+                return ForeignKey(
+                    table=table.name,
+                    field=field,
+                    type=field.type
+                )
+        return None
     
-    return "\n".join([*onces_top_idx, *top]) + \
-          "\n".join([i for i in itertools.chain(onces_before_idx, before)]) + \
-          "\n".join(creates) + \
-          "\n".join([i for i in itertools.chain(onces_after_idx, after)]) + \
-          "\n".join([i for i in itertools.chain(onces_bottom_idx, bottom)])
-          
-def find_key(types_idx, table: Table) -> Optional[ForeignKey]:
-  for field in table.fields:
-    if field.pk:
-      return ForeignKey(types_idx[field.type], table.name, field)
-  return None
-def fk_dictionary(field):
-  type = field.type
-  inline = type.fk if isinstance(type, Type) else type
-  return inline
+    def _handle_kind_directives(self, kind: Type) -> None:
+        """Handle directives from the kind (Type)."""
+        for directive in ["top", "before", "after", "bottom"]:
+            if getattr(kind, directive):
+                data = getattr(kind, directive)
+                if isinstance(data, list):
+                    self.onces_[directive].append(data)
+                
+    
+    def _get_inline_definition(self, field) -> str:
+        """Get the inline definition for a field."""
+        inline_def = ""
+        if isinstance(field, Field):
+            f_type = field.type.inline if isinstance(field.type, Type) else field.type
+            inline_def += f" {f_type}"
+            if not field.nullable:
+                inline_def += " NOT NULL"
+            if field.unique:
+                inline_def += " UNIQUE"
+            if field.id:
+                inline_def += " PRIMARY KEY"
+        else:
+            f_type = field.type.fk
+            if isinstance(field.field, Field):
+                inline_def += f" {f_type} REFERENCES \"{field.table.name}\" (\"{field.field.name}\")"
+            else:
+                raise AttributeError(f"The foreign key from table {field.table.name} has not been identified.")
+
+        return inline_def.strip()
+    
+    def _add_create_table(self, table_name: str, fields: List[str]) -> None:
+        """Add CREATE TABLE statement to the SQL parts."""
+        self.sql_sections["creates"].append(
+            f"CREATE TABLE \"{self.db.name}\".\"{table_name}\" (\n    "
+            f"{',\n    '.join(fields)}\n"
+            f");"
+        )
+    
+    def _build_sql_output(self) -> str:
+        """Build the final SQL output string."""
+        sections = {
+            "top": [ *self.sql_sections["top"], *self.onces_["top"] ],
+            "before": [ *self.sql_sections["before"], *self.onces_["before"] ],
+            "creates": [ *self.sql_sections["creates"] ],
+            "after": [ *self.sql_sections["after"], *self.onces_["after"] ],
+            "bottom": [ *self.sql_sections["bottom"], *self.onces_["bottom"] ]
+        }
+        return "\n\n".join([
+            "\n".join(sections[section])
+            for section in ["top", "before", "creates", "after", "bottom"]
+        ])
