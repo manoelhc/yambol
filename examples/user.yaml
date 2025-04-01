@@ -1,0 +1,660 @@
+name: bizsimple
+
+types:
+  - name: id
+    inline: BIGSERIAL
+    fk: BIGINT
+    id: true
+  - name: tenant_co_id
+    inline: BIGINT NOT NULL
+    index: true
+    fk: BIGINT NOT NULL
+  - name: finance_co_id
+    inline: BIGINT NOT NULL
+    index: true
+    fk: BIGINT NOT NULL
+  - name: name
+    inline: VARCHAR(255) UNIQUE NOT NULL
+    index: true
+  - name: name_people
+    inline: VARCHAR(255) NOT NULL
+    index: true
+  - name: now
+    inline: TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  - name: future
+    inline: TIMESTAMP WITH TIME ZONE
+  - name: fiscal_code
+    inline: VARCHAR(32) UNIQUE
+  - name: email
+    inline: VARCHAR(255) UNIQUE NOT NULL CHECK (email ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$')
+  - name: country_code
+    inline: CHAR(2)
+  - name: tag
+    inline: VARCHAR(32) PRIMARY KEY
+    id: true
+  - name: hash
+    inline: VARCHAR(255)
+  - name: money
+    inline: NUMERIC(10,2)
+  - name: text
+    inline: text
+
+tables:
+  - &countries
+    name: countries
+    fields:
+      - name: id
+        type: id
+      - name: code
+        type: country_code
+
+  - &tenants
+    name: tenants
+    fields: 
+      - name: id
+        type: id
+      - name: fiscal_code
+        type: fiscal_code
+      - name: name
+        type: name
+      - name: country_id
+        type: *countries
+      - name: responsible
+        type: name
+      - name: billing_email
+        type: email
+      - name: commercial_email
+        type: email
+      - name: billing_phone
+        type: name
+      - name: commercial_phone
+        type: name
+      - name: seats
+        type: SMALLINT
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &utags
+    name: utags
+    fields: 
+      - name: name
+        type: tag
+      - name: tenant_id
+        type: *tenants
+      - name: system_tag
+        type: BOOLEAN
+
+  - &persons
+    name: persons
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name_people
+      - name: id_number
+        type: VARCHAR(20)
+
+  - &emp_benefits
+    name: emp_benefits
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: addition_price
+        type: money
+      - name: discount_price
+        type: money
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &business_contracts_templates
+    name: business_contracts_templates
+    desc: "Business contracts templates for clients, employees and contractors. It can be generated from a AI prompt"
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: title
+        type: name
+      - name: markdown
+        type: text
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &business_contracts_template_variables
+    desc: "Variables for business contracts templates, using several sources like tenants, business contracts templates, employees, contractors and clients"
+    name: business_contracts_template_variables
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: business_contract_template_id
+        type: *business_contracts_templates
+      - name: name
+        type: name
+      - name: type
+        type: name
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &recurring_expenses
+    name: recurring_expenses
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: price
+        type: money
+      - name: start_date
+        type: now
+      - name: recurring_period
+        type: INTEGER
+      - name: end_date
+        type: future
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &business_contracts
+    name: business_contracts
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: business_contract_template_id
+        type: *business_contracts_templates
+      - name: final_markdown
+        type: text
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &emp_contracts
+    name: emp_contracts
+    fields:
+      - name: id
+        type: id
+      - name: name
+        type: name
+      - name: hourly_price
+        type: money
+      - name: daily_price
+        type: money
+      - name: monthly_price
+        type: money
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+      
+  - name: emp_ctr_benefits
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: emp_contract_id
+        type: *emp_contracts
+      - name: emp_benefit_id
+        type: *emp_benefits
+
+  - &employees
+    name: employees
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: person_id
+        type: *persons
+      - name: emp_contract_id
+        type: *emp_contracts
+      - name: contract_deadline
+        type: future
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &payroll
+    name: payroll
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: employee_id
+        type: *employees
+      - name: salary
+        type: money
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &users
+    name: users
+    fields:
+      - name: id
+        type: id
+      - name: email
+        type: email
+      - name: person_id
+        type: *persons
+      - name: tenant_id
+        type: *tenants
+      - name: system_user
+        type: BOOLEAN
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - name: tags_users
+    fields:
+      - name: user_id
+        type: *users
+      - name: utags_id
+        type: *utags
+
+  - name: user_actions
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+
+  - &permissions
+    name: permissions
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: readonly_all_users
+        type: BOOLEAN
+      - name: readonly_me
+        type: BOOLEAN
+      - name: write_all_users
+        type: BOOLEAN
+      - name: write_me
+        type: BOOLEAN
+      - name: active
+        type: BOOLEAN
+
+  - name: tags_permisions
+    fields:
+      - name: tenant_id
+        type: *tenants
+      - name: utags_id
+        type: *utags
+      - name: permission_id
+        type: *permissions
+      - name: system_permission
+        type: BOOLEAN
+
+  - name: passwords
+    fields:
+      - name: id
+        type: id
+      - name: user_id
+        type: *users
+      - name: data
+        type: hash
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &plans
+    name: plans
+    fields:
+      - name: id
+        type: id
+      - name: name
+        type: tag
+      - name: price
+        type: money
+      - name: active
+        type: BOOLEAN
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - name: plan_subscriptions
+    fields:
+      - name: tenant_id
+        type: *tenants
+      - name: plan_id
+        type: *plans
+      - name: active
+        type: BOOLEAN
+      - name: start_date
+        type: now
+      - name: end_date
+        type: future
+  
+  - &tenants_terms
+    name: terms
+    fields:
+      - name: id
+        type: id
+      - name: country_id
+        type: *countries
+      - name: version
+        type: integer
+      - name: text 
+        type: text
+      - name: summary
+        type: text
+      - name: active
+        type: BOOLEAN
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &users_terms
+    name: terms
+    fields:
+      - name: id
+        type: id
+      - name: country_id
+        type: *countries
+      - name: version
+        type: integer
+      - name: text 
+        type: text
+      - name: summary
+        type: text
+      - name: active
+        type: BOOLEAN
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - name: users_terms_users
+    fields: 
+      - name: user_id
+        type: *users
+      - name: user_term_id
+        type: *users_terms
+      - name: start_date
+        type: now
+      - name: end_date
+        type: future
+
+  - name: tenants_terms_tenants
+    fields:
+      - name: tenant_id
+        type: *users
+      - name: tenant_term_id
+        type: *tenants_terms
+      - name: start_date
+        type: now
+      - name: end_date
+        type: future
+
+  - name: alarm_tags
+    desc: "Alarm tags to alert managers and users about deadlines and follow-ups"
+    fields:
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: period
+        type: INTEGER
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &scopes
+    name: scopes
+    fields:
+      - name: id
+        type: id
+      - name: user_id
+        type: *users
+      - name: tenant_id
+        type: *tenants
+      - name: deadline
+        type: future
+      - name: price
+        type: money
+      - name: description
+        type: text
+      - name: active
+        type: BOOLEAN
+
+  - name: sub_scope
+    fields:
+      - name: scope_id
+        type: *scopes
+      - name: sub_scope_id
+        type: *scopes
+
+  - &resource_allocations
+    name: resource_allocations
+    fields:
+      - name: id
+        type: id
+      - name: scope_id
+        type: *scopes
+      - name: employee_id
+        type: *employees
+      - name: estimation_hours
+        type: money
+      - name: start_date
+        type: future
+      - name: end_date
+        type: future
+
+  - &worktime
+    name: worktime
+    fields:
+      - name: employee_id
+        type: *employees
+      - name: resource_allocation_id
+        type: *resource_allocations
+      - name: start_time
+        type: now
+      - name: end_time
+        type: future
+
+  - &companies
+    name: companies
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: name
+        type: name
+      - name: address
+        type: VARCHAR(200)
+      - name: fiscal_code
+        type: fiscal_code
+      - name: finance_contact
+        type: *persons
+      - name: commercial_contact
+        type: *persons
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &contractors
+    name: contractors
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: person_id
+        type: *persons
+      - name: company_id
+        type: *companies
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+
+  - &clients
+    name: clients
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: person_id
+        type: *persons
+      - name: company
+        type: *companies
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &technical_orders
+    name: technical_orders
+    fields:
+      - name: id
+        type: id
+      - name: user_id
+        type: *users
+      - name: tenant_id
+        type: *tenants
+      - name: scope_id
+        type: *scopes
+      - name: client_id
+        type: *clients
+      - name: total
+        type: money
+      - name: deadline
+        type: future
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &finance_orders
+    name: finance_orders
+    fields:
+      - name: id
+        type: id
+      - name: user_id
+        type: *users
+      - name: tenant_id
+        type: *tenants
+      - name: technical_order_id
+        type: *technical_orders
+      - name: client_id
+        type: *clients
+      - name: estimated_time
+        type: money
+      - name: estimated_price
+        type: money
+      - name: price
+        type: money
+      - name: discount
+        type: money
+      - name: deadline
+        type: future
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
+  - &commercial_orders
+    name: commercial_orders
+    fields:
+      - name: id
+        type: id
+      - name: tenant_id
+        type: *tenants
+      - name: company_id
+        type: *companies
+      - name: finance_order_id
+        type: *finance_orders
+      - name: technical_order_id
+        type: *technical_orders
+      - name: contractor_id
+        type: *contractors
+      - name: created
+        type: now
+      - name: updated
+        type: future
+      - name: deleted
+        type: future
+
